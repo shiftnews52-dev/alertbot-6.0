@@ -1,12 +1,12 @@
 """
-indicators.py - Новая логика анализа по ТЗ CryptoMicky (ПОЛНОСТЬЮ НОВЫЙ)
+indicators.py - Новая логика анализа по ТЗ CryptoMicky (БЕЗ numpy)
 """
 import time
 import logging
+import math
 from typing import Optional, Dict, List, Tuple
-from collections import defaultdict, deque
+from collections import defaultdict
 import httpx
-import numpy as np
 
 from config import *
 
@@ -142,20 +142,6 @@ def calculate_ema(values: List[float], period: int) -> Optional[float]:
         ema = value * k + ema * (1 - k)
     return ema
 
-def calculate_macd(closes: List[float]) -> Optional[Tuple[float, float, float]]:
-    """Расчёт MACD"""
-    if len(closes) < MACD_SLOW:
-        return None
-    
-    ema_fast = calculate_ema(closes, MACD_FAST)
-    ema_slow = calculate_ema(closes, MACD_SLOW)
-    
-    if ema_fast is None or ema_slow is None:
-        return None
-    
-    macd_line = ema_fast - ema_slow
-    return macd_line, 0, 0  # Упрощённая версия
-
 # ==================== ЛОГИКА АНАЛИЗА ====================
 def determine_trend(closes: List[float]) -> str:
     """Определение тренда по ТЗ"""
@@ -203,12 +189,22 @@ def find_support_resistance_levels(candles: List[dict], window: int = 5) -> Tupl
     support_levels = []
     
     for i in range(window, len(candles) - window):
-        if all(highs[i] >= highs[i-j] for j in range(1, window+1)) and \
-           all(highs[i] >= highs[i+j] for j in range(1, window+1)):
+        # Проверка сопротивления (локальный максимум)
+        is_resistance = True
+        for j in range(1, window + 1):
+            if highs[i] < highs[i - j] or highs[i] < highs[i + j]:
+                is_resistance = False
+                break
+        if is_resistance:
             resistance_levels.append(highs[i])
         
-        if all(lows[i] <= lows[i-j] for j in range(1, window+1)) and \
-           all(lows[i] <= lows[i+j] for j in range(1, window+1)):
+        # Проверка поддержки (локальный минимум)
+        is_support = True
+        for j in range(1, window + 1):
+            if lows[i] > lows[i - j] or lows[i] > lows[i + j]:
+                is_support = False
+                break
+        if is_support:
             support_levels.append(lows[i])
     
     resistance_levels = _group_levels(resistance_levels)
@@ -240,7 +236,6 @@ def _group_levels(levels: List[float], tolerance: float = 0.02) -> List[float]:
 def analyze_signal(pair: str) -> Optional[Dict]:
     """
     ГЛАВНАЯ ФУНКЦИЯ - анализ сигнала по ТЗ CryptoMicky
-    Заменяет старую analyze_signal
     """
     candles_1h = CANDLES.get_candles(pair, "1h")
     if len(candles_1h) < 50:
@@ -264,4 +259,196 @@ def analyze_signal(pair: str) -> Optional[Dict]:
         return long_signal
     
     # Проверяем SHORT условия  
-    short_signal = _check_
+    short_signal = _check_short_conditions(current_price, trend, rsi, resistances, candles_1h)
+    if short_signal:
+        short_signal['pair'] = pair
+        return short_signal
+    
+    return None
+
+def _check_long_conditions(price: float, trend: str, rsi: float, 
+                          supports: List[float], candles: List[dict]) -> Optional[Dict]:
+    """Проверка условий для LONG"""
+    nearest_support = None
+    for support in supports:
+        if support < price and (nearest_support is None or support > nearest_support):
+            if abs(price - support) / price <= 0.03:
+                nearest_support = support
+    
+    if not nearest_support:
+        return None
+    
+    confidence = 0
+    reasons = []
+    
+    # Условие 1: Цена у поддержки
+    if abs(price - nearest_support) / price <= 0.015:
+        confidence += 25
+        reasons.append("🎯 Цена у проверенной поддержки")
+    
+    # Условие 2: RSI в зоне выкупа
+    if 30 <= rsi <= 45:
+        confidence += 25
+        reasons.append(f"📊 RSI в зоне выкупа ({rsi:.1f})")
+    
+    # Условие 3: Бычий тренд
+    if trend == 'bullish':
+        confidence += 20
+        reasons.append("🟢 Бычий тренд")
+    
+    # Условие 4: Объёмы подтверждают
+    if _check_volume_confirmation(candles, 'long'):
+        confidence += 20
+        reasons.append("📈 Объёмы подтверждают разворот")
+    
+    # Бонус за сильный сетап
+    if confidence >= 70:
+        confidence = min(95, confidence + 10)
+        reasons.append("⚡ Сильный сетап")
+    
+    if confidence >= MIN_CONFIDENCE:
+        return _calculate_long_signal(price, nearest_support, confidence, reasons)
+    
+    return None
+
+def _check_short_conditions(price: float, trend: str, rsi: float,
+                           resistances: List[float], candles: List[dict]) -> Optional[Dict]:
+    """Проверка условий для SHORT"""
+    nearest_resistance = None
+    for resistance in resistances:
+        if resistance > price and (nearest_resistance is None or resistance < nearest_resistance):
+            if abs(price - resistance) / price <= 0.03:
+                nearest_resistance = resistance
+    
+    if not nearest_resistance:
+        return None
+    
+    confidence = 0
+    reasons = []
+    
+    # Условие 1: Цена у сопротивления
+    if abs(price - nearest_resistance) / price <= 0.015:
+        confidence += 25
+        reasons.append("🎯 Цена у проверенного сопротивления")
+    
+    # Условие 2: RSI в зоне продаж
+    if 55 <= rsi <= 70:
+        confidence += 25
+        reasons.append(f"📊 RSI в зоне продаж ({rsi:.1f})")
+    
+    # Условие 3: Медвежий тренд
+    if trend == 'bearish':
+        confidence += 20
+        reasons.append("🔴 Медвежий тренд")
+    
+    # Условие 4: Объёмы подтверждают
+    if _check_volume_confirmation(candles, 'short'):
+        confidence += 20
+        reasons.append("📉 Объёмы подтверждают разворот")
+    
+    if confidence >= 70:
+        confidence = min(95, confidence + 10)
+        reasons.append("⚡ Сильный сетап")
+    
+    if confidence >= MIN_CONFIDENCE:
+        return _calculate_short_signal(price, nearest_resistance, confidence, reasons)
+    
+    return None
+
+def _check_volume_confirmation(candles: List[dict], side: str) -> bool:
+    """Проверка подтверждения объёмами"""
+    if len(candles) < 10:
+        return False
+    
+    recent_volumes = [c['v'] for c in candles[-5:]]
+    prev_volumes = [c['v'] for c in candles[-10:-5]]
+    
+    if not recent_volumes or not prev_volumes:
+        return False
+    
+    avg_recent = sum(recent_volumes) / len(recent_volumes)
+    avg_prev = sum(prev_volumes) / len(prev_volumes)
+    
+    return avg_recent > avg_prev * 0.8
+
+def _calculate_long_signal(price: float, support: float, confidence: int, reasons: List[str]) -> Dict:
+    """Расчёт сигнала LONG"""
+    entry_min = support * (1 - ENTRY_ZONE_PERCENT / 100)
+    entry_max = support * (1 + ENTRY_ZONE_PERCENT / 100)
+    stop_loss = support * (1 - STOP_PERCENT / 100)
+    
+    # 3 цели как в ТЗ
+    take_profits = [
+        price * 1.02,  # TP1
+        price * 1.04,  # TP2  
+        price * 1.06   # TP3
+    ]
+    
+    position_size = _calculate_position_size(confidence)
+    
+    return {
+        'side': 'LONG',
+        'price': price,
+        'entry_zone': (entry_min, entry_max),
+        'stop_loss': stop_loss,
+        'take_profit_1': take_profits[0],
+        'take_profit_2': take_profits[1],
+        'take_profit_3': take_profits[2],
+        'score': confidence,  # Для совместимости
+        'confidence': confidence,
+        'reasons': reasons,
+        'position_size': position_size,
+        'sl_percent': abs((stop_loss - price) / price * 100),
+        'tp1_percent': abs((take_profits[0] - price) / price * 100),
+        'tp2_percent': abs((take_profits[1] - price) / price * 100),
+        'tp3_percent': abs((take_profits[2] - price) / price * 100)
+    }
+
+def _calculate_short_signal(price: float, resistance: float, confidence: int, reasons: List[str]) -> Dict:
+    """Расчёт сигнала SHORT"""
+    entry_min = resistance * (1 - ENTRY_ZONE_PERCENT / 100)
+    entry_max = resistance * (1 + ENTRY_ZONE_PERCENT / 100)
+    stop_loss = resistance * (1 + STOP_PERCENT / 100)
+    
+    take_profits = [
+        price * 0.98,  # TP1
+        price * 0.96,  # TP2
+        price * 0.94   # TP3
+    ]
+    
+    position_size = _calculate_position_size(confidence)
+    
+    return {
+        'side': 'SHORT',
+        'price': price,
+        'entry_zone': (entry_min, entry_max),
+        'stop_loss': stop_loss,
+        'take_profit_1': take_profits[0],
+        'take_profit_2': take_profits[1],
+        'take_profit_3': take_profits[2],
+        'score': confidence,
+        'confidence': confidence,
+        'reasons': reasons,
+        'position_size': position_size,
+        'sl_percent': abs((stop_loss - price) / price * 100),
+        'tp1_percent': abs((take_profits[0] - price) / price * 100),
+        'tp2_percent': abs((take_profits[1] - price) / price * 100),
+        'tp3_percent': abs((take_profits[2] - price) / price * 100)
+    }
+
+def _calculate_position_size(confidence: int) -> str:
+    """Расчёт размера позиции по confidence"""
+    if confidence >= 85:
+        return "15-20% депо"
+    elif confidence >= 75:
+        return "10-12% депо"
+    elif confidence >= 70:
+        return "5-8% депо"
+    else:
+        return "3-5% депо"
+
+# ==================== СОВМЕСТИМОСТЬ СО СТАРОЙ ЛОГИКОЙ ====================
+def quick_screen(pair: str) -> bool:
+    """Быстрый скрининг - для совместимости"""
+    candles = CANDLES.get_candles(pair, "1h")
+    return len(candles) >= 50
