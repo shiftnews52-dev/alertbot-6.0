@@ -1,58 +1,53 @@
 """
-config.py - Все настройки и константы бота (ОПТИМИЗИРОВАННАЯ ВЕРСИЯ - ТОЛЬКО 1H)
+config.py - Все настройки и константы бота (ОБНОВЛЕННЫЙ)
 """
 import os
 
 # ==================== BOT SETTINGS ====================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-BOT_NAME = os.getenv("BOT_NAME", "Alpha Entry Bot")
+BOT_NAME = os.getenv("BOT_NAME", "CryptoMicky Alerts")
 SUPPORT_URL = os.getenv("SUPPORT_URL", "https://t.me/support")
 ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()}
 DB_PATH = os.getenv("DB_PATH", "bot.db")
 
 # ==================== TRADING SETTINGS ====================
-# Дефолтные монеты
-DEFAULT_PAIRS = ["BTCUSDT", "ETHUSDT", "TONUSDT", "SOLUSDT", "BNBUSDT"]
+DEFAULT_PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "TONUSDT", "ADAUSDT", "DOTUSDT", "LINKUSDT"]
 
-# ==================== ТАЙМФРЕЙМ (ФИКСИРОВАННЫЙ) ====================
-TIMEFRAME = "1h"  # Фиксированный часовой таймфрейм
-CANDLE_TF = 3600  # 1 час в секундах
-CHECK_INTERVAL = 300  # Проверять каждые 5 минут
-MAX_CANDLES = 300  # Максимум свечей в истории
+# ==================== НОВЫЕ НАСТРОЙКИ CRYPTOMICKY ====================
+TIMEFRAMES = ["1h", "4h"]
+CANDLE_TF = 3600
+CHECK_INTERVAL = 300
 
-# ==================== INDICATORS ====================
-EMA_FAST = 9
-EMA_SLOW = 21
-EMA_TREND = 50
-EMA_LONG_TREND = 200
+# Настройки сигналов
+MIN_CONFIDENCE = 70
+MIN_LEVEL_TOUCHES = 2
+ENTRY_ZONE_PERCENT = 1.0
+STOP_PERCENT = 1.5
+MAX_SIGNALS_PER_DAY = 3
 
+# Индикаторы
 RSI_PERIOD = 14
-RSI_OVERSOLD = 35
-RSI_OVERBOUGHT = 65
-
 MACD_FAST = 12
 MACD_SLOW = 26
 MACD_SIGNAL = 9
 
-BB_PERIOD = 20
-BB_STD = 2
+# ==================== СТАРЫЕ НАСТРОЙКИ (оставляем) ====================
+# Таймфрейм (фиксированный)
+TIMEFRAME = "1h"
+MAX_CANDLES = 300
 
-# ==================== FILTERS (УЛУЧШЕННЫЕ) ====================
-MIN_SIGNAL_SCORE = 70      # Минимальный score для сигнала
-MAX_SIGNALS_PER_DAY = 5    # Максимум сигналов в день на пару
-SIGNAL_COOLDOWN = 21600    # 6 часов между сигналами одной пары (6 * 3600)
+# Фильтры (упрощённые для новой логики)
+MIN_SIGNAL_SCORE = 70
+MIN_VOLUME_RATIO = 1.3
+MIN_VOLATILITY = 0.003
+MAX_SPREAD_PERCENT = 0.5
 
-# Новые фильтры для качества
-MIN_VOLUME_RATIO = 1.3     # Минимальное соотношение объёма (130% от среднего)
-MIN_VOLATILITY = 0.003     # Минимальная волатильность (0.3%)
-MAX_SPREAD_PERCENT = 0.5   # Максимальный спред для ликвидности (0.5%)
+# Оптимизация
+PRICE_CACHE_TTL = 30
+BATCH_SEND_SIZE = 30
+BATCH_SEND_DELAY = 0.05
 
-# ==================== OPTIMIZATION ====================
-PRICE_CACHE_TTL = 30       # Кэш цен на 30 секунд
-BATCH_SEND_SIZE = 30       # Отправлять группами по 30
-BATCH_SEND_DELAY = 0.05    # Задержка между сообщениями
-
-# ==================== IMAGES ====================
+# Картинки
 IMG_START = os.getenv("IMG_START", "")
 IMG_ALERTS = os.getenv("IMG_ALERTS", "")
 IMG_REF = os.getenv("IMG_REF", "")
@@ -68,7 +63,7 @@ TEXTS = {
         "back": "⬅️ Назад",
         
         # Стартовое сообщение
-        "start_text": f"<b>🚀 {BOT_NAME}</b>\n\n⏰ Часовые сигналы с автоматическим TP/SL\n\n• 3-5 качественных сигналов в день\n• Мультистратегия (5+ индикаторов)\n• Объяснение каждого входа\n• Фильтрация по объёму и волатильности\n\n📖 Жми Инструкция для деталей",
+        "start_text": f"<b>🚀 {BOT_NAME}</b>\n\n🎯 Профессиональные сигналы по уровням\n\n• Анализ поддержки/сопротивления\n• RSI + тренд + объёмы\n• 3 цели + стоп-лосс\n• Confidence score для каждого сигнала\n\n📖 Жми Инструкция для деталей",
         
         # Кнопки главного меню
         "btn_alerts": "📈 Алерты",
@@ -81,7 +76,7 @@ TEXTS = {
         "btn_stats": "📊 Статистика",
         
         # Алерты
-        "alerts_title": "📈 <b>Управление алертами</b>\n\n⏰ Таймфрейм: 1 час\nВыбери монеты (до 10)\n\nАктивно: {count}/10",
+        "alerts_title": "📈 <b>Управление алертами</b>\n\n⏰ Таймфрейм: 1 час + 4 часа\nВыбери монеты (до 10)\n\nАктивно: {count}/10",
         "add_custom_coin": "➕ Своя монета",
         "my_coins": "📋 Мои монеты",
         "how_it_works": "💡 Как это работает?",
@@ -100,12 +95,12 @@ TEXTS = {
         "guide_step1": "<b>Шаг 1:</b> Оплати доступ",
         "guide_step2": "<b>Шаг 2:</b> Выбери монеты (до 10)",
         "guide_step3": "<b>Шаг 3:</b> Получай сигналы",
-        "guide_signal_info": "<b>В каждом сигнале:</b>\n• Цена входа\n• 🎯 TP1/TP2/TP3 (15%/40%/80% позиции)\n• 🛡 Stop Loss\n• Причины входа\n• Сила сигнала (score)\n\n<b>Особенности:</b>\n• Таймфрейм: 1 час\n• Фильтрация по объёму\n• Проверка волатильности\n• Только качественные сигналы",
+        "guide_signal_info": "<b>В каждом сигнале:</b>\n• Зона входа (диапазон цен)\n• 🎯 3 цели take profit\n• 🛡 Stop Loss\n• Причины входа\n• Confidence Score\n• Рекомендация по объёму\n\n<b>Особенности:</b>\n• Анализ по уровням поддержки/сопротивления\n• RSI + тренд + объёмы\n• Только качественные сетапы",
         "guide_disclaimer": "<b>⚠️ Важно:</b> Это не финансовый совет",
         
         # Оплата
         "payment_title": "🔓 <b>Открыть доступ</b>",
-        "payment_features": "✅ 3-5 качественных сигналов в день\n✅ Автоматический TP/SL\n✅ Мультистратегия\n✅ До 10 монет\n✅ Рефералка 50%\n✅ Часовой таймфрейм\n✅ Фильтры качества",
+        "payment_features": "✅ Профессиональные сигналы по уровням\n✅ 3 цели + стоп-лосс\n✅ Анализ RSI + тренд\n✅ Confidence score\n✅ До 10 монет\n✅ Рефералка 50%",
         "pay_stars": "⭐ Оплата Stars",
         "pay_crypto": "💎 Крипто",
         "pay_code": "🎟 У меня код",
@@ -156,7 +151,7 @@ TEXTS = {
         "back": "⬅️ Back",
         
         # Start message
-        "start_text": f"<b>🚀 {BOT_NAME}</b>\n\n⏰ Hourly signals with automatic TP/SL\n\n• 3-5 quality signals per day\n• Multi-strategy (5+ indicators)\n• Explanation for each entry\n• Volume and volatility filtering\n\n📖 Press Guide for details",
+        "start_text": f"<b>🚀 {BOT_NAME}</b>\n\n🎯 Professional level-based signals\n\n• Support/resistance analysis\n• RSI + trend + volume\n• 3 targets + stop loss\n• Confidence score for each signal\n\n📖 Press Guide for details",
         
         # Main menu buttons
         "btn_alerts": "📈 Alerts",
@@ -169,7 +164,7 @@ TEXTS = {
         "btn_stats": "📊 Statistics",
         
         # Alerts
-        "alerts_title": "📈 <b>Manage Alerts</b>\n\n⏰ Timeframe: 1 hour\nSelect coins (up to 10)\n\nActive: {count}/10",
+        "alerts_title": "📈 <b>Manage Alerts</b>\n\n⏰ Timeframe: 1h + 4h\nSelect coins (up to 10)\n\nActive: {count}/10",
         "add_custom_coin": "➕ Custom coin",
         "my_coins": "📋 My coins",
         "how_it_works": "💡 How it works?",
@@ -188,12 +183,12 @@ TEXTS = {
         "guide_step1": "<b>Step 1:</b> Pay for access",
         "guide_step2": "<b>Step 2:</b> Select coins (up to 10)",
         "guide_step3": "<b>Step 3:</b> Receive signals",
-        "guide_signal_info": "<b>Each signal includes:</b>\n• Entry price\n• 🎯 TP1/TP2/TP3 (15%/40%/80% position)\n• 🛡 Stop Loss\n• Entry reasons\n• Signal strength (score)\n\n<b>Features:</b>\n• Timeframe: 1 hour\n• Volume filtering\n• Volatility check\n• Quality signals only",
+        "guide_signal_info": "<b>Each signal includes:</b>\n• Entry zone (price range)\n• 🎯 3 take profit targets\n• 🛡 Stop Loss\n• Entry reasons\n• Confidence Score\n• Volume recommendation\n\n<b>Features:</b>\n• Support/resistance level analysis\n• RSI + trend + volume\n• Quality setups only",
         "guide_disclaimer": "<b>⚠️ Important:</b> This is not financial advice",
         
         # Payment
         "payment_title": "🔓 <b>Unlock Access</b>",
-        "payment_features": "✅ 3-5 quality signals per day\n✅ Automatic TP/SL\n✅ Multi-strategy\n✅ Up to 10 coins\n✅ 50% referral program\n✅ Hourly timeframe\n✅ Quality filters",
+        "payment_features": "✅ Professional level-based signals\n✅ 3 targets + stop loss\n✅ RSI + trend analysis\n✅ Confidence score\n✅ Up to 10 coins\n✅ 50% referral program",
         "pay_stars": "⭐ Pay with Stars",
         "pay_crypto": "💎 Crypto",
         "pay_code": "🎟 I have a code",
@@ -248,7 +243,6 @@ def t(uid_or_lang, key: str, **kwargs) -> str:
     
     text = TEXTS.get(lang, TEXTS["ru"]).get(key, key)
     
-    # Форматирование если есть kwargs
     if kwargs:
         try:
             text = text.format(**kwargs)
@@ -257,15 +251,10 @@ def t(uid_or_lang, key: str, **kwargs) -> str:
     
     return text
 
-# Информация о текущих настройках
 print("=" * 60)
-print(f"📊 НАСТРОЙКИ БОТА")
+print("🎯 CRYPTOMICKY ALERTS BOT - READY!")
 print("=" * 60)
-print(f"⏰ Таймфрейм: {TIMEFRAME} (фиксированный)")
-print(f"🕐 Секунд в свече: {CANDLE_TF}")
-print(f"🔄 Интервал проверки: {CHECK_INTERVAL}s")
-print(f"⏳ Cooldown: {SIGNAL_COOLDOWN}s ({SIGNAL_COOLDOWN/3600:.1f}ч)")
-print(f"📊 Минимальный score: {MIN_SIGNAL_SCORE}")
-print(f"📈 Мин. объём: {MIN_VOLUME_RATIO}x")
-print(f"💹 Мин. волатильность: {MIN_VOLATILITY*100:.1f}%")
+print(f"⏰ Таймфреймы: {TIMEFRAMES}")
+print(f"📊 Пары: {len(DEFAULT_PAIRS)}")
+print(f"🎯 Min Confidence: {MIN_CONFIDENCE}%")
 print("=" * 60)
