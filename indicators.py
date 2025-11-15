@@ -1,5 +1,5 @@
 """
-indicators.py - Профессиональная логика анализа (БЕЗ ОШИБОК)
+indicators.py - Профессиональная логика анализа (С fetch_price)
 """
 import time
 import logging
@@ -45,6 +45,64 @@ class PriceCache:
         self.cache = {k: v for k, v in self.cache.items() if now - v[2] < self.ttl}
 
 PRICE_CACHE = PriceCache()
+
+# ==================== API FUNCTIONS ====================
+async def fetch_price(client: httpx.AsyncClient, pair: str) -> Optional[Tuple[float, float]]:
+    """Получить цену с Binance"""
+    cached = PRICE_CACHE.get(pair)
+    if cached:
+        return cached
+    
+    try:
+        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={pair.upper()}"
+        resp = await client.get(url, timeout=5.0)
+        resp.raise_for_status()
+        data = resp.json()
+        price = float(data["lastPrice"])
+        volume = float(data["volume"])
+        
+        PRICE_CACHE.set(pair, price, volume)
+        return price, volume
+    except Exception as e:
+        logger.error(f"Error fetching {pair}: {e}")
+        return None
+
+async def fetch_candles_binance(pair: str, tf: str, limit: int = 100):
+    """Получение свечей с Binance"""
+    try:
+        async with httpx.AsyncClient() as client:
+            tf_map = {"1h": "1h", "4h": "4h"}
+            interval = tf_map.get(tf, "1h")
+            
+            url = f"https://api.binance.com/api/v3/klines"
+            params = {
+                "symbol": pair,
+                "interval": interval,
+                "limit": limit
+            }
+            
+            response = await client.get(url, params=params, timeout=10.0)
+            response.raise_for_status()
+            
+            klines = response.json()
+            candles = []
+            
+            for kline in klines:
+                candle = {
+                    't': kline[0] / 1000,
+                    'o': float(kline[1]),
+                    'h': float(kline[2]),
+                    'l': float(kline[3]),
+                    'c': float(kline[4]),
+                    'v': float(kline[5])
+                }
+                candles.append(candle)
+            
+            return candles
+            
+    except Exception as e:
+        logger.error(f"Error fetching candles {pair} {tf}: {e}")
+        return None
 
 # ==================== ИНДИКАТОРЫ ====================
 def calculate_rsi(closes: List[float], period: int = RSI_PERIOD) -> Optional[float]:
@@ -427,7 +485,8 @@ def _get_position_size(confidence: int) -> str:
     else:
         return "3-5% депо"
 
-# Совместимость
+# ==================== СОВМЕСТИМОСТЬ ====================
 def quick_screen(pair: str) -> bool:
+    """Быстрый скрининг - для совместимости"""
     candles = CANDLES.get_candles(pair, "1h")
     return len(candles) >= 50
