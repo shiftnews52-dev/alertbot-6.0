@@ -6,8 +6,8 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.utils import executor
 
-from config import BOT_TOKEN, ADMIN_IDS
-from database import init_db, create_user, update_user_activity, get_user, is_subscription_active
+from config import BOT_TOKEN, ADMIN_IDS, TEST_MODE, TEST_PASSWORD, TEST_USER_IDS
+from database import init_db, create_user, update_user_activity, get_user, is_subscription_active, is_test_user, grant_access
 from payment_handlers import show_plans_comparison, handle_payment_start, handle_payment_check
 
 # Настройка логирования
@@ -33,13 +33,16 @@ async def cmd_start(message: types.Message):
     await create_user(user_id, username, first_name, last_name)
     await update_user_activity(user_id)
     
-    # Проверяем подписку
-    has_access = await is_subscription_active(user_id)
+    # Проверяем подписку (включая тестовый режим)
+    has_access = await is_subscription_active(user_id) or await is_test_user(user_id)
     
     text = "🤖 <b>Добро пожаловать в Crypto Signals Bot!</b>\n\n"
     
     if has_access:
-        text += "✅ <b>У тебя есть Premium доступ!</b>\n\n"
+        text += "✅ <b>У тебя есть доступ к боту!</b>\n\n"
+        if await is_test_user(user_id):
+            text += "🎯 <i>Тестовый режим (7 дней)</i>\n\n"
+        
         text += "📊 Доступные функции:\n"
         text += "• Торговые сигналы в реальном времени\n"
         text += "• Профессиональный анализ рынка\n"
@@ -67,6 +70,28 @@ async def cmd_start(message: types.Message):
     kb.add(types.InlineKeyboardButton("ℹ️ Помощь", callback_data="help"))
     
     await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+@dp.message_handler(commands=['test'])
+async def cmd_test(message: types.Message):
+    """Тестовый вход"""
+    if not TEST_MODE:
+        await message.answer("❌ Тестовый режим отключен")
+        return
+    
+    args = message.get_args()
+    if args == TEST_PASSWORD:
+        user_id = message.from_user.id
+        TEST_USER_IDS.append(user_id)
+        
+        # Даём тестовый доступ
+        await grant_access(user_id)
+        
+        await message.answer("✅ <b>Тестовый доступ активирован!</b>\n\n"
+                           "Тебе открыт полный доступ к боту на 7 дней!\n\n"
+                           "Нажми /start для начала работы", 
+                           parse_mode="HTML")
+    else:
+        await message.answer("❌ Неверный пароль")
 
 @dp.callback_query_handler(lambda c: c.data == "menu_pay")
 async def menu_pay_handler(call: types.CallbackQuery):
@@ -169,4 +194,5 @@ async def on_shutdown(dp):
     await bot.session.close()
 
 if __name__ == '__main__':
+    from aiogram import executor
     executor.start_polling(dp, on_startup=on_startup, on_shutdown=on_shutdown)
