@@ -1,58 +1,48 @@
 import logging
 from aiogram import types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import SUBSCRIPTION_PLANS, CRYPTO_BOT_USERNAME, REFERRAL_PERCENT
+from config import SUBSCRIPTION_PLANS, CRYPTO_BOT_USERNAME, REFERRAL_PERCENT, t
 from payment import create_payment, check_payment, process_successful_payment
 from database import get_user, update_payment_status
 
 logger = logging.getLogger(__name__)
 
 async def show_plans_comparison(call: types.CallbackQuery):
-    """Показать сравнение тарифов"""
+    """Упрощенное меню тарифов"""
     user = await get_user(call.from_user.id)
     lang = user["language"] if user else "ru"
     
-    text = "🏆 <b>Сравнение тарифов</b>\n\n"
+    text = "💎 <b>Выбери тариф</b>\n\n"
+    text += "✅ Торговые сигналы в реальном времени\n"
+    text += "✅ Профессиональный анализ\n" 
+    text += "✅ Настройка алертов\n"
+    text += f"✅ Реферальная программа {REFERRAL_PERCENT}%\n\n"
     
-    # Таблица сравнения
-    text += "┌──────────────┬──────────┬──────────┬────────────┐\n"
-    text += "│   <b>Тариф</b>   │  <b>Цена</b>   │ <b>Скидка</b>  │ <b>Экономия</b>  │\n"
-    text += "├──────────────┼──────────┼──────────┼────────────┤\n"
+    text += "👇 <b>Доступные тарифы:</b>\n\n"
     
+    # Простой список тарифов без таблицы
     for plan_key, plan in SUBSCRIPTION_PLANS.items():
-        tariff_name = plan["name"].ljust(8)
-        price = f"{plan['price']}$".ljust(6)
-        
         if plan["discount"] > 0:
-            discount = f"{plan['discount']}%".ljust(6)
-            savings = f"{plan['original_price'] - plan['price']}$".ljust(8)
+            text += f"🎯 <b>{plan['name']}</b> - {plan['price']} USDT (скидка {plan['discount']}%)\n"
         else:
-            discount = "—".ljust(6)
-            savings = "—".ljust(8)
-        
-        text += f"│ {tariff_name}    │  {price}  │  {discount}  │   {savings}  │\n"
+            text += f"📦 <b>{plan['name']}</b> - {plan['price']} USDT\n"
     
-    text += "└──────────────┴──────────┴──────────┴────────────┘\n\n"
-    
-    text += "💡 <b>Рекомендуем:</b>\n"
-    text += "• <b>3 месяца</b> - оптимальная цена\n"
-    text += "• <b>12 месяцев</b> - максимальная выгода\n\n"
-    
-    text += "👇 Выбери подходящий тариф:"
+    text += f"\n💡 <b>Рекомендуем:</b> 3 месяца - оптимальная цена\n\n"
+    text += "Выбери подходящий вариант:"
     
     kb = InlineKeyboardMarkup(row_width=1)
     
     for plan_key, plan in SUBSCRIPTION_PLANS.items():
         if plan["discount"] > 0:
-            button_text = f"🎯 {plan['name']} - {plan['price']} USDT (-{plan['discount']}%)"
+            button_text = f"{plan['name']} - {plan['price']} USDT (-{plan['discount']}%)"
         else:
-            button_text = f"📦 {plan['name']} - {plan['price']} USDT"
+            button_text = f"{plan['name']} - {plan['price']} USDT"
         
         kb.add(InlineKeyboardButton(button_text, callback_data=f"select_plan_{plan_key}"))
     
-    kb.add(InlineKeyboardButton("❌ Назад", callback_data="back_main"))
+    kb.add(InlineKeyboardButton("🔙 Назад", callback_data="back_main"))
     
-    await call.message.edit_text(text, reply_markup=kb)
+    await call.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     await call.answer()
 
 async def handle_payment_start(call: types.CallbackQuery, plan_type: str = "1_month"):
@@ -81,7 +71,6 @@ async def handle_payment_start(call: types.CallbackQuery, plan_type: str = "1_mo
     if plan["discount"] > 0:
         text += f"💸 Было: <s>{plan['original_price']} USDT</s>\n"
         text += f"🎁 Скидка: {plan['discount']}%\n"
-        text += f"💵 Экономия: {plan['original_price'] - plan['price']} USDT\n"
     
     text += f"⏰ Срок: {plan['days']} дней\n"
     text += f"👥 Рефералка: {REFERRAL_PERCENT}%\n\n"
@@ -95,7 +84,7 @@ async def handle_payment_start(call: types.CallbackQuery, plan_type: str = "1_mo
     kb.add(InlineKeyboardButton("📋 Выбрать другой тариф", callback_data="menu_pay"))
     kb.add(InlineKeyboardButton("❌ Отмена", callback_data="back_main"))
     
-    await call.message.edit_text(text, reply_markup=kb)
+    await call.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
     await call.answer()
 
 async def handle_payment_check(call: types.CallbackQuery):
