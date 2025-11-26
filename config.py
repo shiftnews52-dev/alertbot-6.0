@@ -8,6 +8,11 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x]
 DB_PATH = "bot_database.db"
 
+# ==================== TEST MODE ====================
+TEST_MODE = True
+TEST_PASSWORD = "test123"
+TEST_USER_IDS = [123456789]  # Замени на свой ID
+
 # ==================== CRYPTO BOT PAYMENT ====================
 CRYPTO_BOT_TOKEN = os.getenv("CRYPTO_BOT_TOKEN")
 CRYPTO_BOT_USERNAME = os.getenv("CRYPTO_BOT_USERNAME", "CryptoBot")
