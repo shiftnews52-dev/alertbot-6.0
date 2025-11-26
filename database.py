@@ -5,7 +5,7 @@ import logging
 from typing import Optional, Dict, List
 import aiosqlite
 from contextlib import asynccontextmanager
-from config import DB_PATH, SUBSCRIPTION_PLANS, REFERRAL_PERCENT
+from config import DB_PATH, SUBSCRIPTION_PLANS, REFERRAL_PERCENT, TEST_MODE, TEST_USER_IDS
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +121,10 @@ async def get_user(user_id: int) -> Optional[Dict]:
         row = await cursor.fetchone()
         return dict(row) if row else None
 
+async def is_test_user(user_id: int) -> bool:
+    """Проверить тестовый доступ"""
+    return TEST_MODE and user_id in TEST_USER_IDS
+
 async def create_subscription(user_id: int, plan_type: str):
     plan = SUBSCRIPTION_PLANS.get(plan_type)
     if not plan:
@@ -155,6 +159,10 @@ async def get_user_subscription(user_id: int) -> Optional[Dict]:
         return dict(row) if row else None
 
 async def is_subscription_active(user_id: int) -> bool:
+    """Проверить активна ли подписка (включая тестовый режим)"""
+    if await is_test_user(user_id):
+        return True
+        
     subscription = await get_user_subscription(user_id)
     return subscription is not None
 
